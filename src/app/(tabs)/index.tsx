@@ -7,11 +7,12 @@ import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { Section } from '@/components/ui/section';
+import { SpendChart } from '@/components/ui/spend-chart';
 import { StatCard } from '@/components/ui/stat-card';
 import { Surface } from '@/components/ui/surface';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { getMonthlySpend, getProjectedTotals } from '@/lib/billing';
+import { getMonthlyProjection, getMonthlySpend, getProjectedTotals } from '@/lib/billing';
 import { formatMoney } from '@/lib/formatters';
 import { selectLatestRate, useRatesStore } from '@/store/rates-store';
 import { useSettingsStore } from '@/store/settings-store';
@@ -30,6 +31,23 @@ export default function HomeScreen() {
         selectLatestRate(ratesState, currency, baseCurrency)
       ),
     [subscriptions, baseCurrency, ratesState]
+  );
+  const monthFormatter = React.useMemo(
+    () => new Intl.DateTimeFormat(undefined, { month: 'short' }),
+    []
+  );
+  const monthlyProjection = React.useMemo(
+    () =>
+      getMonthlyProjection(
+        subscriptions,
+        baseCurrency,
+        (currency) => selectLatestRate(ratesState, currency, baseCurrency),
+        6
+      ).map((point) => ({
+        label: monthFormatter.format(point.monthStart),
+        value: point.total,
+      })),
+    [subscriptions, baseCurrency, ratesState, monthFormatter]
   );
 
   const activeSubscriptions = subscriptions.filter((item) => item.status === 'active');
@@ -82,6 +100,13 @@ export default function HomeScreen() {
           />
         </View>
       </View>
+
+      <SpendChart
+        title="6-month billing forecast"
+        subtitle="Upcoming charges converted into your base currency"
+        currency={baseCurrency}
+        data={monthlyProjection}
+      />
 
       <Section title="Active subscriptions">
         {activeSubscriptions.length ? (

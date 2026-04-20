@@ -90,7 +90,9 @@ export async function resolveRate(
   if (historical) return historical.rate;
 
   try {
-    return await ensureLatestRate(base, quote);
+    const latest = await ensureLatestRate(base, quote);
+    await saveRateSnapshot(base, quote, latest, chargeISO);
+    return latest;
   } catch {
     return null;
   }

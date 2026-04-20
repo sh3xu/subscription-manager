@@ -9,8 +9,12 @@ import {
   parseISO,
   startOfMonth,
 } from '@/lib/date-utils';
+import { normalizeCurrencyAmount } from '@/lib/formatters';
 
 import { Subscription, TimelineCharge } from '@/types/subscription';
+
+const AVERAGE_DAYS_PER_YEAR = 365.2425;
+const AVERAGE_DAYS_PER_MONTH = AVERAGE_DAYS_PER_YEAR / 12;
 
 function advanceDate(date: Date, subscription: Subscription) {
   if (subscription.billingCycle === 'monthly') return addMonths(date, 1);
@@ -59,13 +63,13 @@ export function generateTimeline(subscriptions: Subscription[], daysAhead = 60, 
 export function getMonthlySpend(subscription: Subscription) {
   if (subscription.billingCycle === 'monthly') return subscription.amount;
   if (subscription.billingCycle === 'yearly') return subscription.amount / 12;
-  return (subscription.amount * 30) / (subscription.customCycleDays ?? 30);
+  return (subscription.amount * AVERAGE_DAYS_PER_MONTH) / (subscription.customCycleDays ?? 30);
 }
 
 export function getYearlySpend(subscription: Subscription) {
   if (subscription.billingCycle === 'monthly') return subscription.amount * 12;
   if (subscription.billingCycle === 'yearly') return subscription.amount;
-  return (subscription.amount * 365) / (subscription.customCycleDays ?? 30);
+  return (subscription.amount * AVERAGE_DAYS_PER_YEAR) / (subscription.customCycleDays ?? 30);
 }
 
 // Resolver receives a subscription's native currency and returns the multiplier required to
@@ -80,10 +84,16 @@ export type ProjectedTotals = {
   missingCurrencies: string[];
 };
 
+export type MonthlyProjectionPoint = {
+  monthStart: Date;
+  total: number;
+};
+
 export function getProjectedTotals(
   subscriptions: Subscription[],
   baseCurrency: string,
-  resolveRate: RateResolver
+  resolveRate: RateResolver,
+  locale?: string
 ): ProjectedTotals {
   const active = subscriptions.filter((item) => item.status === 'active');
   const missingCurrencies = new Set<string>();
@@ -101,9 +111,11 @@ export function getProjectedTotals(
       monthlyByItem.set(item.id, nativeMonthly);
       continue;
     }
-    monthlyTotal += nativeMonthly * rate;
-    yearlyTotal += nativeYearly * rate;
-    monthlyByItem.set(item.id, nativeMonthly * rate);
+    const normalizedMonthly = normalizeCurrencyAmount(nativeMonthly * rate, baseCurrency, locale);
+    const normalizedYearly = normalizeCurrencyAmount(nativeYearly * rate, baseCurrency, locale);
+    monthlyTotal = normalizeCurrencyAmount(monthlyTotal + normalizedMonthly, baseCurrency, locale);
+    yearlyTotal = normalizeCurrencyAmount(yearlyTotal + normalizedYearly, baseCurrency, locale);
+    monthlyByItem.set(item.id, normalizedMonthly);
   }
 
   const mostExpensive = active
@@ -117,6 +129,49 @@ export function getProjectedTotals(
     mostExpensive,
     missingCurrencies: Array.from(missingCurrencies),
   };
+}
+
+export function getMonthlyProjection(
+  subscriptions: Subscription[],
+  baseCurrency: string,
+  resolveRate: RateResolver,
+  months = 6,
+  fromDate = new Date(),
+  locale?: string
+): MonthlyProjectionPoint[] {
+  const active = subscriptions.filter((item) => item.status === 'active');
+  const monthStarts = Array.from({ length: months }, (_, index) =>
+    startOfMonth(addMonths(fromDate, index))
+  );
+  const monthTotals = monthStarts.map((monthStart) => ({
+    monthStart,
+    total: 0,
+  }));
+
+  for (const subscription of active) {
+    const rate = subscription.currency === baseCurrency ? 1 : resolveRate(subscription.currency);
+    if (rate === null) continue;
+
+    let chargeDate = getNextBillingDate(subscription, addDays(monthStarts[0], -1));
+    const finalMonth = monthStarts[monthStarts.length - 1];
+    const finalDate = endOfMonth(finalMonth);
+
+    while (isBefore(chargeDate, finalDate) || isEqual(chargeDate, finalDate)) {
+      const bucketIndex = monthStarts.findIndex(
+        (monthStart) =>
+          chargeDate.getFullYear() === monthStart.getFullYear() &&
+          chargeDate.getMonth() === monthStart.getMonth()
+      );
+      if (bucketIndex >= 0) {
+        const converted = normalizeCurrencyAmount(subscription.amount * rate, baseCurrency, locale);
+        const running = monthTotals[bucketIndex].total + converted;
+        monthTotals[bucketIndex].total = normalizeCurrencyAmount(running, baseCurrency, locale);
+      }
+      chargeDate = advanceDate(chargeDate, subscription);
+    }
+  }
+
+  return monthTotals;
 }
 
 export function getCurrentMonthRange(date = new Date()) {
