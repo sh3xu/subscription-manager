@@ -15,7 +15,7 @@ import { Colors, Radius, Spacing } from '@/constants/theme';
 
 export default function AppTabs() {
   const scheme = useColorScheme();
-  const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
+  const colors = Colors[scheme ?? 'light'];
   const insets = useSafeAreaInsets();
 
   return (
