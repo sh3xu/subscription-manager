@@ -9,6 +9,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { formatMoney } from '@/lib/formatters';
 
 type SpendChartDatum = {
+  key: string;
   label: string;
   value: number;
 };
@@ -60,7 +61,7 @@ export function SpendChart({ title, subtitle, currency, data }: SpendChartProps)
               offset += ratio * PIE_CIRCUMFERENCE;
               return (
                 <Circle
-                  key={item.label}
+                  key={item.key}
                   cx={PIE_SIZE / 2}
                   cy={PIE_SIZE / 2}
                   r={PIE_RADIUS}
@@ -87,7 +88,7 @@ export function SpendChart({ title, subtitle, currency, data }: SpendChartProps)
           {data.map((item, index) => {
             const ratio = total === 0 ? 0 : (item.value / total) * 100;
             return (
-              <View key={item.label} style={styles.legendRow}>
+              <View key={item.key} style={styles.legendRow}>
                 <View
                   style={[
                     styles.legendDot,

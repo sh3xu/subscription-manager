@@ -40,16 +40,20 @@ export default function HomeScreen() {
         .map((subscription) => {
           const nativeMonthly = getMonthlySpend(subscription);
           if (subscription.currency === baseCurrency) {
-            return { label: subscription.name, value: nativeMonthly };
+            return { key: subscription.id, label: subscription.name, value: nativeMonthly };
           }
           const rate = selectLatestRate(ratesState, subscription.currency, baseCurrency);
           if (rate === null) return null;
           return {
+            key: subscription.id,
             label: subscription.name,
             value: nativeMonthly * rate,
           };
         })
-        .filter((item): item is { label: string; value: number } => Boolean(item) && item.value > 0),
+        .filter(
+          (item): item is { key: string; label: string; value: number } =>
+            Boolean(item) && item.value > 0
+        ),
     [activeSubscriptions, baseCurrency, ratesState]
   );
 
