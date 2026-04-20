@@ -31,6 +31,18 @@ export default function HomeScreen() {
     [subscriptions, baseCurrency, ratesState]
   );
   const activeSubscriptions = subscriptions.filter((item) => item.status === 'active');
+  const topMonthly = React.useMemo(() => {
+    if (!totals.mostExpensive) return null;
+    const rate = selectLatestRate(ratesState, totals.mostExpensive.currency, baseCurrency);
+    const native = totals.mostExpensive.amount;
+    if (totals.mostExpensive.currency === baseCurrency) {
+      return formatMoney(native, baseCurrency);
+    }
+    if (rate === null) {
+      return formatMoney(native, totals.mostExpensive.currency);
+    }
+    return formatMoney(native * rate, baseCurrency);
+  }, [totals.mostExpensive, ratesState, baseCurrency]);
 
   return (
     <Screen>
@@ -50,7 +62,11 @@ export default function HomeScreen() {
         </ThemedText>
         <ThemedText type="small" themeColor="textSecondary">
           Across {activeSubscriptions.length}{' '}
-          {activeSubscriptions.length === 1 ? 'active subscription' : 'active subscriptions'}.
+          {activeSubscriptions.length === 1 ? 'active subscription' : 'active subscriptions'}
+          {totals.missingCurrencies.length
+            ? ` · fetching rates for ${totals.missingCurrencies.join(', ')}`
+            : ''}
+          .
         </ThemedText>
       </Surface>
 
@@ -62,11 +78,7 @@ export default function HomeScreen() {
           <StatCard
             label="Top spend"
             value={totals.mostExpensive?.name ?? '—'}
-            hint={
-              totals.mostExpensive
-                ? formatMoney(totals.mostExpensive.amount, totals.mostExpensive.currency)
-                : 'Add one to track'
-            }
+            hint={topMonthly ?? 'Add one to track'}
           />
         </View>
       </View>

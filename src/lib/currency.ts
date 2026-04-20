@@ -1,3 +1,4 @@
+import { CURRENCY_CODES } from '@/constants/currencies';
 import {
   getLatestSnapshot,
   getSnapshotAt,
@@ -6,9 +7,20 @@ import {
 } from '@/db/rates';
 
 type LatestRatesResponse = {
-  result: 'success' | 'error';
+  success?: boolean;
+  base?: string;
+  date?: string;
   rates: Record<string, number>;
+  error?: {
+    code?: number;
+    type?: string;
+    info?: string;
+  };
 };
+
+function roundRateToTwoDecimals(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
 
 export function toISODateString(date: Date): string {
   const year = date.getFullYear();
@@ -17,16 +29,50 @@ export function toISODateString(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-export async function fetchLatestRates(base: string): Promise<Record<string, number>> {
-  const response = await fetch(`https://open.er-api.com/v6/latest/${base}`);
+function getExchangeApiBaseUrl() {
+  return process.env.EXPO_PUBLIC_EXCHANGE_API_BASE_URL || 'https://api.exchangerate.host';
+}
+
+async function fetchRates(
+  base: string,
+  symbols: string[],
+  date?: string
+): Promise<Record<string, number>> {
+  const endpoint = new URL(getExchangeApiBaseUrl());
+  endpoint.searchParams.set('type', 'rates');
+  endpoint.searchParams.set('base', base);
+  endpoint.searchParams.set('symbols', symbols.join(','));
+  if (date) endpoint.searchParams.set('date', date);
+
+  const response = await fetch(endpoint.toString());
   if (!response.ok) {
     throw new Error('Failed to fetch exchange rates');
   }
   const payload = (await response.json()) as LatestRatesResponse;
-  if (payload.result !== 'success') {
-    throw new Error('Exchange API returned an error');
+  if (!payload.rates || typeof payload.rates !== 'object') {
+    const reason = payload.error?.info || payload.error?.type || 'Exchange API returned an error';
+    throw new Error(reason);
   }
-  return payload.rates;
+  const roundedRates: Record<string, number> = {};
+  for (const [code, rate] of Object.entries(payload.rates)) {
+    if (!Number.isFinite(rate)) continue;
+    roundedRates[code] = roundRateToTwoDecimals(rate);
+  }
+  return roundedRates;
+}
+
+export async function fetchLatestRates(base: string, symbols: string[]): Promise<Record<string, number>> {
+  return fetchRates(base, symbols);
+}
+
+async function saveSnapshotBatch(base: string, snapshotDate: string, rates: Record<string, number>) {
+  const writes: Promise<void>[] = [];
+  for (const [quote, rate] of Object.entries(rates)) {
+    if (!Number.isFinite(rate)) continue;
+    if (quote === base) continue;
+    writes.push(saveRateSnapshot(base, quote, rate, snapshotDate));
+  }
+  await Promise.all(writes);
 }
 
 // Convert an amount using a provided multiplicative rate. `rate` is interpreted as
@@ -52,7 +98,7 @@ export async function ensureLatestRate(
   }
 
   try {
-    const rates = await fetchLatestRates(base);
+    const rates = await fetchLatestRates(base, [quote]);
     const rate = rates[quote];
     if (!rate) {
       throw new Error(`No FX rate available for ${base}->${quote}`);
@@ -90,11 +136,22 @@ export async function resolveRate(
   if (historical) return historical.rate;
 
   try {
-    const latest = await ensureLatestRate(base, quote);
-    await saveRateSnapshot(base, quote, latest, chargeISO);
-    return latest;
+    const symbols = CURRENCY_CODES.filter((code) => code !== base);
+    const historicalRates = await fetchRates(base, symbols, chargeISO);
+    await saveSnapshotBatch(base, chargeISO, historicalRates);
+    const historicalRate = historicalRates[quote];
+    if (!historicalRate) {
+      throw new Error(`No historical FX rate available for ${base}->${quote} at ${chargeISO}`);
+    }
+    return historicalRate;
   } catch {
-    return null;
+    try {
+      const latest = await ensureLatestRate(base, quote);
+      await saveRateSnapshot(base, quote, latest, chargeISO);
+      return latest;
+    } catch {
+      return null;
+    }
   }
 }
 
