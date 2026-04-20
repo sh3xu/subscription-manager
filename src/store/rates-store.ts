@@ -54,5 +54,13 @@ export function selectLatestRate(
   quote: string
 ): number | null {
   if (base === quote) return 1;
-  return state.latest[base]?.[quote] ?? null;
+  const direct = state.latest[base]?.[quote];
+  if (direct !== undefined) return direct;
+
+  const inverse = state.latest[quote]?.[base];
+  if (inverse !== undefined && inverse !== 0) {
+    return 1 / inverse;
+  }
+
+  return null;
 }

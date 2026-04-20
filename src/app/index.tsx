@@ -7,7 +7,6 @@ import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { Section } from '@/components/ui/section';
-import { SpendChart } from '@/components/ui/spend-chart';
 import { StatCard } from '@/components/ui/stat-card';
 import { Surface } from '@/components/ui/surface';
 import { Spacing } from '@/constants/theme';
@@ -24,7 +23,6 @@ export default function HomeScreen() {
   const subscriptions = useSubscriptionsStore((state) => state.items);
   const baseCurrency = useSettingsStore((state) => state.baseCurrency);
   const ratesState = useRatesStore();
-
   const totals = React.useMemo(
     () =>
       getProjectedTotals(subscriptions, baseCurrency, (currency) =>
@@ -32,31 +30,7 @@ export default function HomeScreen() {
       ),
     [subscriptions, baseCurrency, ratesState]
   );
-
   const activeSubscriptions = subscriptions.filter((item) => item.status === 'active');
-  const currentMonthServiceSpend = React.useMemo(
-    () =>
-      activeSubscriptions
-        .map((subscription) => {
-          const nativeMonthly = getMonthlySpend(subscription);
-          if (subscription.currency === baseCurrency) {
-            return { key: subscription.id, label: subscription.name, value: nativeMonthly };
-          }
-          const rate = selectLatestRate(ratesState, subscription.currency, baseCurrency);
-          if (rate === null) return null;
-          return {
-            key: subscription.id,
-            label: subscription.name,
-            value: nativeMonthly * rate,
-          };
-        })
-        .filter(
-          (item): item is { key: string; label: string; value: number } =>
-            Boolean(item) && item.value > 0
-        ),
-    [activeSubscriptions, baseCurrency, ratesState]
-  );
-
   const topMonthly = React.useMemo(() => {
     if (!totals.mostExpensive) return null;
     const rate = selectLatestRate(ratesState, totals.mostExpensive.currency, baseCurrency);
@@ -73,6 +47,9 @@ export default function HomeScreen() {
   return (
     <Screen>
       <View style={styles.heroHeader}>
+        {/* <ThemedText type="small" themeColor="textSecondary">
+          Subscription Manager
+        </ThemedText> */}
         <ThemedText style={styles.heroTitle}>Subscription Tracker</ThemedText>
       </View>
 
@@ -106,14 +83,9 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      <SpendChart
-        title="Current month service spend share"
-        subtitle="Percentage split by active subscription"
-        currency={baseCurrency}
-        data={currentMonthServiceSpend}
-      />
-
-      <Section title="Active subscriptions">
+      <Section
+        title="Active subscriptions"
+      >
         {activeSubscriptions.length ? (
           <View style={styles.list}>
             {activeSubscriptions.map((subscription) => (
