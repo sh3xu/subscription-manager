@@ -11,7 +11,7 @@ import { StatCard } from '@/components/ui/stat-card';
 import { Surface } from '@/components/ui/surface';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { getProjectedTotals } from '@/lib/billing';
+import { getMonthlySpend, getProjectedTotals } from '@/lib/billing';
 import { formatMoney } from '@/lib/formatters';
 import { selectLatestRate, useRatesStore } from '@/store/rates-store';
 import { useSettingsStore } from '@/store/settings-store';
@@ -34,7 +34,7 @@ export default function HomeScreen() {
   const topMonthly = React.useMemo(() => {
     if (!totals.mostExpensive) return null;
     const rate = selectLatestRate(ratesState, totals.mostExpensive.currency, baseCurrency);
-    const native = totals.mostExpensive.amount;
+    const native = getMonthlySpend(totals.mostExpensive);
     if (totals.mostExpensive.currency === baseCurrency) {
       return formatMoney(native, baseCurrency);
     }

@@ -18,10 +18,6 @@ type LatestRatesResponse = {
   };
 };
 
-function roundRateToTwoDecimals(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
-}
-
 export function toISODateString(date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -53,12 +49,12 @@ async function fetchRates(
     const reason = payload.error?.info || payload.error?.type || 'Exchange API returned an error';
     throw new Error(reason);
   }
-  const roundedRates: Record<string, number> = {};
+  const rates: Record<string, number> = {};
   for (const [code, rate] of Object.entries(payload.rates)) {
     if (!Number.isFinite(rate)) continue;
-    roundedRates[code] = roundRateToTwoDecimals(rate);
+    rates[code] = rate;
   }
-  return roundedRates;
+  return rates;
 }
 
 export async function fetchLatestRates(base: string, symbols: string[]): Promise<Record<string, number>> {

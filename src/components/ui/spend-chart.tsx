@@ -1,5 +1,6 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
+import Svg, { Circle } from 'react-native-svg';
 
 import { ThemedText } from '@/components/themed-text';
 import { Surface } from '@/components/ui/surface';
@@ -19,11 +20,16 @@ type SpendChartProps = {
   data: SpendChartDatum[];
 };
 
-const BAR_MAX_HEIGHT = 120;
+const PIE_SIZE = 168;
+const PIE_STROKE = 22;
+const PIE_RADIUS = (PIE_SIZE - PIE_STROKE) / 2;
+const PIE_CIRCUMFERENCE = 2 * Math.PI * PIE_RADIUS;
+const SEGMENT_COLORS = ['#6366F1', '#06B6D4', '#14B8A6', '#22C55E', '#F59E0B', '#EF4444'];
 
 export function SpendChart({ title, subtitle, currency, data }: SpendChartProps) {
   const theme = useTheme();
-  const maxValue = Math.max(...data.map((item) => item.value), 0);
+  const total = data.reduce((sum, item) => sum + item.value, 0);
+  let offset = 0;
 
   return (
     <Surface bordered padding="md">
@@ -36,30 +42,68 @@ export function SpendChart({ title, subtitle, currency, data }: SpendChartProps)
         ) : null}
       </View>
 
-      <View style={styles.barsRow}>
-        {data.map((item) => {
-          const ratio = maxValue === 0 ? 0 : item.value / maxValue;
-          const height = Math.max(4, Math.round(ratio * BAR_MAX_HEIGHT));
-          return (
-            <View key={item.label} style={styles.barCell}>
-              <ThemedText type="small" style={styles.valueLabel} numberOfLines={1}>
-                {formatMoney(item.value, currency)}
-              </ThemedText>
-              <View
-                style={[
-                  styles.bar,
-                  {
-                    height,
-                    backgroundColor: ratio === 0 ? theme.border : theme.accent,
-                  },
-                ]}
-              />
-              <ThemedText type="small" themeColor="textSecondary">
-                {item.label}
-              </ThemedText>
-            </View>
-          );
-        })}
+      <View style={styles.content}>
+        <View style={styles.pieWrap}>
+          <Svg width={PIE_SIZE} height={PIE_SIZE}>
+            <Circle
+              cx={PIE_SIZE / 2}
+              cy={PIE_SIZE / 2}
+              r={PIE_RADIUS}
+              stroke={theme.border}
+              strokeWidth={PIE_STROKE}
+              fill="none"
+            />
+            {data.map((item, index) => {
+              const ratio = total === 0 ? 0 : item.value / total;
+              const strokeDasharray = `${ratio * PIE_CIRCUMFERENCE} ${PIE_CIRCUMFERENCE}`;
+              const strokeDashoffset = -offset;
+              offset += ratio * PIE_CIRCUMFERENCE;
+              return (
+                <Circle
+                  key={item.label}
+                  cx={PIE_SIZE / 2}
+                  cy={PIE_SIZE / 2}
+                  r={PIE_RADIUS}
+                  stroke={SEGMENT_COLORS[index % SEGMENT_COLORS.length]}
+                  strokeWidth={PIE_STROKE}
+                  strokeDasharray={strokeDasharray}
+                  strokeDashoffset={strokeDashoffset}
+                  strokeLinecap="butt"
+                  fill="none"
+                  transform={`rotate(-90 ${PIE_SIZE / 2} ${PIE_SIZE / 2})`}
+                />
+              );
+            })}
+          </Svg>
+          <View style={styles.centerLabel}>
+            <ThemedText type="small" themeColor="textSecondary">
+              Total
+            </ThemedText>
+            <ThemedText type="smallBold">{formatMoney(total, currency)}</ThemedText>
+          </View>
+        </View>
+
+        <View style={styles.legend}>
+          {data.map((item, index) => {
+            const ratio = total === 0 ? 0 : (item.value / total) * 100;
+            return (
+              <View key={item.label} style={styles.legendRow}>
+                <View
+                  style={[
+                    styles.legendDot,
+                    { backgroundColor: SEGMENT_COLORS[index % SEGMENT_COLORS.length] },
+                  ]}
+                />
+                <View style={styles.legendText}>
+                  <ThemedText type="smallBold">{item.label}</ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {formatMoney(item.value, currency)} ({ratio.toFixed(1)}%)
+                  </ThemedText>
+                </View>
+              </View>
+            );
+          })}
+        </View>
       </View>
     </Surface>
   );
@@ -69,24 +113,33 @@ const styles = StyleSheet.create({
   header: {
     gap: Spacing.half,
   },
-  barsRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    gap: Spacing.one,
+  content: {
+    gap: Spacing.three,
     marginTop: Spacing.three,
   },
-  barCell: {
-    flex: 1,
+  pieWrap: {
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  centerLabel: {
+    position: 'absolute',
+    alignItems: 'center',
+    gap: Spacing.half,
+  },
+  legend: {
     gap: Spacing.one,
   },
-  valueLabel: {
-    fontSize: 11,
+  legendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
   },
-  bar: {
-    width: '80%',
-    minHeight: 4,
-    borderRadius: 8,
+  legendDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  legendText: {
+    flex: 1,
   },
 });

@@ -133,7 +133,7 @@ export const CURRENCIES: CurrencyOption[] = [
   { code: 'SAR', name: 'Saudi Riyal' },
   { code: 'SBD', name: 'Solomon Islands Dollar' },
   { code: 'SCR', name: 'Seychellois Rupee' },
-  { code: 'SDG', name: 'South Sudanese Pound' },
+  { code: 'SDG', name: 'Sudanese Pound' },
   { code: 'SEK', name: 'Swedish Krona' },
   { code: 'SGD', name: 'Singapore Dollar' },
   { code: 'SHP', name: 'Saint Helena Pound' },

@@ -12,7 +12,7 @@ import { StatCard } from '@/components/ui/stat-card';
 import { Surface } from '@/components/ui/surface';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { getMonthlyProjection, getMonthlySpend, getProjectedTotals } from '@/lib/billing';
+import { getMonthlySpend, getProjectedTotals } from '@/lib/billing';
 import { formatMoney } from '@/lib/formatters';
 import { selectLatestRate, useRatesStore } from '@/store/rates-store';
 import { useSettingsStore } from '@/store/settings-store';
@@ -32,25 +32,26 @@ export default function HomeScreen() {
       ),
     [subscriptions, baseCurrency, ratesState]
   );
-  const monthFormatter = React.useMemo(
-    () => new Intl.DateTimeFormat(undefined, { month: 'short' }),
-    []
-  );
-  const monthlyProjection = React.useMemo(
-    () =>
-      getMonthlyProjection(
-        subscriptions,
-        baseCurrency,
-        (currency) => selectLatestRate(ratesState, currency, baseCurrency),
-        6
-      ).map((point) => ({
-        label: monthFormatter.format(point.monthStart),
-        value: point.total,
-      })),
-    [subscriptions, baseCurrency, ratesState, monthFormatter]
-  );
 
   const activeSubscriptions = subscriptions.filter((item) => item.status === 'active');
+  const currentMonthServiceSpend = React.useMemo(
+    () =>
+      activeSubscriptions
+        .map((subscription) => {
+          const nativeMonthly = getMonthlySpend(subscription);
+          if (subscription.currency === baseCurrency) {
+            return { label: subscription.name, value: nativeMonthly };
+          }
+          const rate = selectLatestRate(ratesState, subscription.currency, baseCurrency);
+          if (rate === null) return null;
+          return {
+            label: subscription.name,
+            value: nativeMonthly * rate,
+          };
+        })
+        .filter((item): item is { label: string; value: number } => Boolean(item) && item.value > 0),
+    [activeSubscriptions, baseCurrency, ratesState]
+  );
 
   const topMonthly = React.useMemo(() => {
     if (!totals.mostExpensive) return null;
@@ -102,10 +103,10 @@ export default function HomeScreen() {
       </View>
 
       <SpendChart
-        title="6-month billing forecast"
-        subtitle="Upcoming charges converted into your base currency"
+        title="Current month service spend share"
+        subtitle="Percentage split by active subscription"
         currency={baseCurrency}
-        data={monthlyProjection}
+        data={currentMonthServiceSpend}
       />
 
       <Section title="Active subscriptions">

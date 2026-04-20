@@ -11,7 +11,8 @@ export function getCurrencyFractionDigits(currency: string, locale?: string) {
 export function normalizeCurrencyAmount(amount: number, currency: string, locale?: string) {
   const digits = getCurrencyFractionDigits(currency, locale);
   const factor = 10 ** digits;
-  return Math.round((amount + Number.EPSILON) * factor) / factor;
+  const epsilon = amount >= 0 ? Number.EPSILON : -Number.EPSILON;
+  return Math.round((amount + epsilon) * factor) / factor;
 }
 
 export function formatMoney(amount: number, currency: string, locale?: string) {
