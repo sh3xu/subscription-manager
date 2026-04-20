@@ -1,8 +1,8 @@
 import React from 'react';
 import { ScrollView, StyleSheet, View, ViewStyle } from 'react-native';
-import { Edge, SafeAreaView } from 'react-native-safe-area-context';
+import { Edge, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { BottomTabBarHeight, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 type ScreenProps = {
@@ -23,7 +23,10 @@ export function Screen({
   footer,
 }: ScreenProps) {
   const theme = useTheme();
-  const bottomPad = withTabInset ? BottomTabInset + Spacing.four : Spacing.four;
+  const insets = useSafeAreaInsets();
+  const bottomPad = withTabInset
+    ? BottomTabBarHeight + insets.bottom + Spacing.three
+    : Spacing.four;
 
   const body = (
     <View style={[styles.body, { paddingBottom: bottomPad }, contentStyle]}>{children}</View>

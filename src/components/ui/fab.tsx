@@ -1,8 +1,9 @@
 import React from 'react';
 import { Platform, Pressable, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
-import { BottomTabInset, Radius, Spacing } from '@/constants/theme';
+import { BottomTabBarHeight, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 type FabProps = {
@@ -12,6 +13,7 @@ type FabProps = {
 
 export function Fab({ label, onPress }: FabProps) {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   return (
     <Pressable
       onPress={onPress}
@@ -20,7 +22,7 @@ export function Fab({ label, onPress }: FabProps) {
         {
           backgroundColor: theme.accent,
           shadowColor: theme.shadow,
-          bottom: BottomTabInset + Spacing.three,
+          bottom: BottomTabBarHeight + insets.bottom + Spacing.two,
           opacity: pressed ? 0.92 : 1,
         },
       ]}
